@@ -167,6 +167,7 @@ class GeneratorBackend:
         # Thread-safe mechanism for detecting FORCE STOP exception
         self.force_stop_exception_occurred = threading.Event()
         self.is_fault_device = False
+        self.fault_error_code = None
 
         self.max_position_embeddings = self.model_wrapper.max_position_embeddings
 
@@ -302,13 +303,20 @@ class GeneratorBackend:
                 command_result = 0
                 error_msg = ""
             else:
-                if not self._wait_for_force_stop_exception():
+                force_stop_detected = self._wait_for_force_stop_exception()
+                if force_stop_detected:
+                    command_result = 0
+                    error_msg = ""
+                elif self._is_oom_fault():
                     logger.warning(
                         f"FORCE STOP exception was not observed for device {self.npu_device_id}; "
-                        "treat stop_device success as pause success."
+                        "treat stop_device success as pause success for OOM recovery."
                     )
-                command_result = 0
-                error_msg = ""
+                    command_result = 0
+                    error_msg = ""
+                else:
+                    command_result = 1
+                    error_msg = "Timeout waiting for FORCE STOP exception"
         elapsed = time.time() - start_time
         remaining_time = 10.0 - elapsed
         if remaining_time > 0:
@@ -334,7 +342,10 @@ class GeneratorBackend:
                 )
                 return False
         else:
-            return True
+            return not self._is_oom_fault()
+
+    def _is_oom_fault(self):
+        return self.fault_error_code == ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY
 
     def _handle_uce_error(self):
         """Check and recover UCE error in kvcache. Returns (command_result, error_msg)."""

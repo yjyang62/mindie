@@ -17,6 +17,7 @@ import torch
 from mindie_llm.text_generator.adapter.generator_backend import GeneratorBackend
 from mindie_llm.text_generator.utils.model_input import ModelInput
 from mindie_llm.text_generator.utils.sampling_metadata import SamplingMetadata, SamplingData, SamplingParam
+from mindie_llm.utils.log.error_code import ErrorCode
 GENERATOR_BACKEND_AVAILABLE = True
 _import_error = None
 
@@ -255,14 +256,34 @@ class TestGeneratorBackend(unittest.TestCase):
     @patch(MOCKED_GET_MODEL_WRAPPER)
     @patch("mindie_llm.text_generator.adapter.generator_backend.time.sleep")
     @patch("torch_npu.npu.stop_device")
-    def test_execute_recover_command_cmd_pause_engine_force_stop_timeout_success(
+    def test_execute_recover_command_cmd_pause_engine_force_stop_timeout(
         self, mock_stop_device, mock_sleep, mock_get_wrapper
     ):
-        """Test pause succeeds when force stop notification is not observed."""
+        """Test pause fails when force stop notification is not observed for non-OOM faults."""
         mock_get_wrapper.return_value = create_mock_model_wrapper()
         mock_stop_device.return_value = 0
 
         backend = GeneratorBackend(get_default_model_config())
+        backend._handle_uce_error = MagicMock(return_value=(0, ""))
+        backend._wait_for_force_stop_exception = MagicMock(return_value=False)
+
+        result = backend.execute_recover_command("CMD_PAUSE_ENGINE")
+
+        self.assertEqual(result["command_result"], 1)
+        self.assertIn("Timeout waiting for FORCE STOP exception", result["error_msg"])
+
+    @patch(MOCKED_GET_MODEL_WRAPPER)
+    @patch("mindie_llm.text_generator.adapter.generator_backend.time.sleep")
+    @patch("torch_npu.npu.stop_device")
+    def test_execute_recover_command_cmd_pause_engine_oom_force_stop_timeout_success(
+        self, mock_stop_device, mock_sleep, mock_get_wrapper
+    ):
+        """Test OOM pause succeeds when force stop notification is not observed."""
+        mock_get_wrapper.return_value = create_mock_model_wrapper()
+        mock_stop_device.return_value = 0
+
+        backend = GeneratorBackend(get_default_model_config())
+        backend.fault_error_code = ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY
         backend._handle_uce_error = MagicMock(return_value=(0, ""))
         backend._wait_for_force_stop_exception = MagicMock(return_value=False)
 
@@ -399,6 +420,17 @@ class TestGeneratorBackend(unittest.TestCase):
 
         result = backend._wait_for_force_stop_exception()
         self.assertTrue(result)
+
+    @patch(MOCKED_GET_MODEL_WRAPPER)
+    def test_wait_for_force_stop_exception_oom_fault_device(self, mock_get_wrapper):
+        """Test OOM fault devices report force stop as not observed."""
+        mock_get_wrapper.return_value = create_mock_model_wrapper()
+        backend = GeneratorBackend(get_default_model_config())
+        backend.is_fault_device = True
+        backend.fault_error_code = ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY
+
+        result = backend._wait_for_force_stop_exception()
+        self.assertFalse(result)
 
     @patch(MOCKED_GET_MODEL_WRAPPER)
     def test_wait_for_force_stop_exception_detected(self, mock_get_wrapper):

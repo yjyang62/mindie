@@ -786,6 +786,7 @@ class TestGenerator(unittest.TestCase):
             generator.generate_token(im, warmup=False)
         self.assertEqual(cm.exception.error_code, ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY)
         self.assertTrue(generator.generator_backend.is_fault_device)
+        self.assertEqual(generator.generator_backend.fault_error_code, ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY)
 
     @patch('mindie_llm.utils.prof.profiler.span_end')
     @patch('mindie_llm.utils.prof.profiler.span_attr')
@@ -815,6 +816,7 @@ class TestGenerator(unittest.TestCase):
 
         self.assertEqual(cm.exception.error_code, ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY)
         self.assertTrue(generator.generator_backend.is_fault_device)
+        self.assertEqual(generator.generator_backend.fault_error_code, ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY)
 
     @patch('mindie_llm.utils.prof.profiler.span_end')
     @patch('mindie_llm.utils.prof.profiler.span_attr')

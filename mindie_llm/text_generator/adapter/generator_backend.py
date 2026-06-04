@@ -167,6 +167,7 @@ class GeneratorBackend:
         # Thread-safe mechanism for detecting FORCE STOP exception
         self.force_stop_exception_occurred = threading.Event()
         self.is_fault_device = False
+        self.skip_force_stop_wait = False
 
         self.max_position_embeddings = self.model_wrapper.max_position_embeddings
 
@@ -301,12 +302,21 @@ class GeneratorBackend:
             elif uce_command_result == 2:
                 command_result = 0
                 error_msg = ""
-            elif not self._wait_for_force_stop_exception():
-                command_result = 1
-                error_msg = "Timeout waiting for FORCE STOP exception"
             else:
-                command_result = 0
-                error_msg = ""
+                force_stop_detected = self._wait_for_force_stop_exception()
+                if force_stop_detected:
+                    command_result = 0
+                    error_msg = ""
+                elif self.skip_force_stop_wait:
+                    logger.warning(
+                        f"FORCE STOP exception was not observed for device {self.npu_device_id}; "
+                        "treat stop_device success as pause success for OOM recovery."
+                    )
+                    command_result = 0
+                    error_msg = ""
+                else:
+                    command_result = 1
+                    error_msg = "Timeout waiting for FORCE STOP exception"
         elapsed = time.time() - start_time
         remaining_time = 10.0 - elapsed
         if remaining_time > 0:
@@ -318,21 +328,20 @@ class GeneratorBackend:
         raise NotImplementedError("Subclasses must implement _execute_cmd_reinit_npu")
 
     def _wait_for_force_stop_exception(self):
-        if not self.is_fault_device:
-            timeout = 60.0
-            exception_detected = self.force_stop_exception_occurred.wait(timeout=timeout)
-            if exception_detected:
-                logger.info(
-                    f"FORCE STOP exception detected for device {self.npu_device_id}, stop_device execution successful"
-                )
-                return True
-            else:
-                logger.warning(
-                    f"Timeout waiting for FORCE STOP exception for device {self.npu_device_id} after {timeout} seconds"
-                )
-                return False
-        else:
+        if self.skip_force_stop_wait:
+            return False
+        timeout = 60.0
+        exception_detected = self.force_stop_exception_occurred.wait(timeout=timeout)
+        if exception_detected:
+            logger.info(
+                f"FORCE STOP exception detected for device {self.npu_device_id}, stop_device execution successful"
+            )
             return True
+        else:
+            logger.warning(
+                f"Timeout waiting for FORCE STOP exception for device {self.npu_device_id} after {timeout} seconds"
+            )
+            return False
 
     def _handle_uce_error(self):
         """Check and recover UCE error in kvcache. Returns (command_result, error_msg)."""

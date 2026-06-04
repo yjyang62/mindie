@@ -274,6 +274,25 @@ class TestGeneratorBackend(unittest.TestCase):
     @patch(MOCKED_GET_MODEL_WRAPPER)
     @patch("mindie_llm.text_generator.adapter.generator_backend.time.sleep")
     @patch("torch_npu.npu.stop_device")
+    def test_execute_recover_command_cmd_pause_engine_skip_force_stop_wait(
+        self, mock_stop_device, mock_sleep, mock_get_wrapper
+    ):
+        """Test OOM pause succeeds when force stop wait is skipped."""
+        mock_get_wrapper.return_value = create_mock_model_wrapper()
+        mock_stop_device.return_value = 0
+
+        backend = GeneratorBackend(get_default_model_config())
+        backend.skip_force_stop_wait = True
+        backend._handle_uce_error = MagicMock(return_value=(0, ""))
+
+        result = backend.execute_recover_command("CMD_PAUSE_ENGINE")
+
+        self.assertEqual(result["command_result"], 0)
+        self.assertEqual(result["error_msg"], "")
+
+    @patch(MOCKED_GET_MODEL_WRAPPER)
+    @patch("mindie_llm.text_generator.adapter.generator_backend.time.sleep")
+    @patch("torch_npu.npu.stop_device")
     def test_execute_recover_command_cmd_pause_engine_force_stop_success(
         self, mock_stop_device, mock_sleep, mock_get_wrapper
     ):
@@ -392,13 +411,24 @@ class TestGeneratorBackend(unittest.TestCase):
 
     @patch(MOCKED_GET_MODEL_WRAPPER)
     def test_wait_for_force_stop_exception_is_fault_device(self, mock_get_wrapper):
-        """Test _wait_for_force_stop_exception when is_fault_device is True."""
+        """Test is_fault_device no longer skips force stop waiting by itself."""
         mock_get_wrapper.return_value = create_mock_model_wrapper()
         backend = GeneratorBackend(get_default_model_config())
         backend.is_fault_device = True
+        backend.force_stop_exception_occurred.set()
 
         result = backend._wait_for_force_stop_exception()
         self.assertTrue(result)
+
+    @patch(MOCKED_GET_MODEL_WRAPPER)
+    def test_wait_for_force_stop_exception_skip_force_stop_wait(self, mock_get_wrapper):
+        """Test skip_force_stop_wait reports force stop as not observed."""
+        mock_get_wrapper.return_value = create_mock_model_wrapper()
+        backend = GeneratorBackend(get_default_model_config())
+        backend.skip_force_stop_wait = True
+
+        result = backend._wait_for_force_stop_exception()
+        self.assertFalse(result)
 
     @patch(MOCKED_GET_MODEL_WRAPPER)
     def test_wait_for_force_stop_exception_detected(self, mock_get_wrapper):

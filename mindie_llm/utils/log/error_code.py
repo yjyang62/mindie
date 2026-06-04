@@ -68,9 +68,10 @@ class ErrorCodeException(RuntimeError):
 
 
 EXCEPTION_TO_ERROR_CODE = {
+    "MIE05E0000005": ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY,
     "MIE05E000005": ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY,
- 	"MIE05E000006": ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY,
- 	"NPU out of memory": ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY,
+    "MIE05E000006": ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY,
+    "NPU OUT OF MEMORY": ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY,
     "HBM MULTI BIT ECC ERROR": ErrorCode.TEXT_GENERATOR_HBM_MULTI_BIT_ECC_ERROR,
 }
 
@@ -78,6 +79,7 @@ EXCEPTION_TO_ERROR_CODE = {
 # convert exception raised from model to ErrorCodeException,
 # and then TextGenerator will continue to raise it to executor
 def convert_exception_to_error_code(exception_str: str):
+    exception_str = exception_str.upper()
     for exception_key, error_code in EXCEPTION_TO_ERROR_CODE.items():
         if exception_key in exception_str:
             return error_code

@@ -88,6 +88,18 @@ class TestConvertExceptionToErrorCode(unittest.TestCase):
         result = convert_exception_to_error_code("something MIE05E0000005 in the message")
         self.assertEqual(result, ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY)
 
+    def test_matches_standard_oom_error_code(self):
+        result = convert_exception_to_error_code("something MIE05E000005 in the message")
+        self.assertEqual(result, ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY)
+
+    def test_matches_acl_graph_oom_error_code(self):
+        result = convert_exception_to_error_code("something MIE05E000006 in the message")
+        self.assertEqual(result, ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY)
+
+    def test_matches_npu_oom_case_insensitive(self):
+        result = convert_exception_to_error_code("runtime reported npu out of memory")
+        self.assertEqual(result, ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY)
+
     def test_matches_hbm_ecc_error_code(self):
         result = convert_exception_to_error_code("HBM MULTI BIT ECC ERROR occurred")
         self.assertEqual(result, ErrorCode.TEXT_GENERATOR_HBM_MULTI_BIT_ECC_ERROR)

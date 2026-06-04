@@ -679,7 +679,7 @@ class Generator(PDInterface):
             raise e
         except ErrorCodeException as e:
             self.generator_backend.is_fault_device = True
-            self.generator_backend.fault_error_code = e.error_code
+            self.generator_backend.skip_force_stop_wait = e.error_code == ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY
             if warmup:
                 print_log(
                     self.rank,
@@ -692,7 +692,7 @@ class Generator(PDInterface):
         except Exception as e:
             if isinstance(e, ErrorCodeException):
                 self.generator_backend.is_fault_device = True
-                self.generator_backend.fault_error_code = e.error_code
+                self.generator_backend.skip_force_stop_wait = e.error_code == ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY
                 raise e
             error_code = convert_exception_to_error_code(str(e))
 
@@ -711,7 +711,7 @@ class Generator(PDInterface):
                 message = f"{error_code.name} fault happened in generate_token, error code: {error_code.value}."
                 logger.error(message)
                 self.generator_backend.is_fault_device = True
-                self.generator_backend.fault_error_code = error_code
+                self.generator_backend.skip_force_stop_wait = error_code == ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY
                 raise ErrorCodeException(error_code) from e
             print_log(self.rank, logger.error, f"Unknown exception: {e}")
             if self.is_inference_pause:
@@ -916,7 +916,7 @@ class Generator(PDInterface):
             try:
                 self.infer_context.reset_all_context()
                 self.generator_backend.is_fault_device = False
-                self.generator_backend.fault_error_code = None
+                self.generator_backend.skip_force_stop_wait = False
                 ret_dict = self.generator_backend.execute_recover_command(command)
             except Exception as e:
                 error_msg = f"Failed to execute recovery command {command!r}: {e}"
@@ -929,7 +929,7 @@ class Generator(PDInterface):
             self.plugin_manager.last_sequence_ids = None
             self.plugin_manager.is_inference_pause = False
             self.is_inference_pause = False
-            self.generator_backend.fault_error_code = None
+            self.generator_backend.skip_force_stop_wait = False
             self.plugin_manager.reset_async_pipeline()
 
             ret_dict[command_res_key] = 0

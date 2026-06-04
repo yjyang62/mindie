@@ -678,6 +678,7 @@ class Generator(PDInterface):
                 self.clear_cache(input_metadata.all_sequence_ids)
             raise e
         except ErrorCodeException as e:
+            self.generator_backend.is_fault_device = True
             if warmup:
                 print_log(
                     self.rank,

@@ -301,10 +301,12 @@ class GeneratorBackend:
             elif uce_command_result == 2:
                 command_result = 0
                 error_msg = ""
-            elif not self._wait_for_force_stop_exception():
-                command_result = 1
-                error_msg = "Timeout waiting for FORCE STOP exception"
             else:
+                if not self._wait_for_force_stop_exception():
+                    logger.warning(
+                        f"FORCE STOP exception was not observed for device {self.npu_device_id}; "
+                        "treat stop_device success as pause success."
+                    )
                 command_result = 0
                 error_msg = ""
         elapsed = time.time() - start_time
@@ -319,7 +321,7 @@ class GeneratorBackend:
 
     def _wait_for_force_stop_exception(self):
         if not self.is_fault_device:
-            timeout = 60.0
+            timeout = 10.0
             exception_detected = self.force_stop_exception_occurred.wait(timeout=timeout)
             if exception_detected:
                 logger.info(

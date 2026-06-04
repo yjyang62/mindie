@@ -255,10 +255,10 @@ class TestGeneratorBackend(unittest.TestCase):
     @patch(MOCKED_GET_MODEL_WRAPPER)
     @patch("mindie_llm.text_generator.adapter.generator_backend.time.sleep")
     @patch("torch_npu.npu.stop_device")
-    def test_execute_recover_command_cmd_pause_engine_force_stop_timeout(
+    def test_execute_recover_command_cmd_pause_engine_force_stop_timeout_success(
         self, mock_stop_device, mock_sleep, mock_get_wrapper
     ):
-        """Test execute_recover_command when force stop times out."""
+        """Test pause succeeds when force stop notification is not observed."""
         mock_get_wrapper.return_value = create_mock_model_wrapper()
         mock_stop_device.return_value = 0
 
@@ -268,8 +268,8 @@ class TestGeneratorBackend(unittest.TestCase):
 
         result = backend.execute_recover_command("CMD_PAUSE_ENGINE")
 
-        self.assertEqual(result["command_result"], 1)
-        self.assertIn("Timeout waiting for FORCE STOP exception", result["error_msg"])
+        self.assertEqual(result["command_result"], 0)
+        self.assertEqual(result["error_msg"], "")
 
     @patch(MOCKED_GET_MODEL_WRAPPER)
     @patch("mindie_llm.text_generator.adapter.generator_backend.time.sleep")

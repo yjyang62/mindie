@@ -791,6 +791,35 @@ class TestGenerator(unittest.TestCase):
     @patch('mindie_llm.utils.prof.profiler.span_attr')
     @patch('mindie_llm.utils.prof.profiler.span_start')
     @patch("mindie_llm.text_generator.generator.Generator.__init__", return_value=None)
+    def test_generate_token_marks_fault_device_for_error_code_exception(
+        self, _, mock_span_start, mock_span_attr, mock_span_end
+    ):
+        """直接抛出 ErrorCodeException 时同样标记故障设备。"""
+        mock_span_start.return_value = None
+        generator = Generator(self.model_config)
+        generator.pd_config = MagicMock()
+        generator.pd_config.model_role = STANDARD_TAG
+        generator.input_metadata_queue = queue.Queue()
+        generator.rank = 0
+        generator.async_inference = False
+        generator.plugin_manager = MagicMock()
+        generator.plugin_manager.generate_token.side_effect = ErrorCodeException(ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY)
+        generator.generator_backend = MagicMock()
+        generator.generator_backend.is_fault_device = False
+        im = MagicMock(spec=InputMetadata)
+        im.batch_seq_len = np.array([0])
+        im.is_prefill = False
+
+        with self.assertRaises(ErrorCodeException) as cm:
+            generator.generate_token(im, warmup=False)
+
+        self.assertEqual(cm.exception.error_code, ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY)
+        self.assertTrue(generator.generator_backend.is_fault_device)
+
+    @patch('mindie_llm.utils.prof.profiler.span_end')
+    @patch('mindie_llm.utils.prof.profiler.span_attr')
+    @patch('mindie_llm.utils.prof.profiler.span_start')
+    @patch("mindie_llm.text_generator.generator.Generator.__init__", return_value=None)
     def test_generate_token_notify_force_stop_when_inference_paused(
         self, _, mock_span_start, mock_span_attr, mock_span_end
     ):

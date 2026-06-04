@@ -808,23 +808,8 @@ class PluginManager:
                 if is_force_stop_exception(e):
                     logger.info(f"FORCE STOP exception detected in plugin_manager.forward_loop: {e}")
                     self.generator_backend.notify_force_stop_exception()
-
-                error_code = convert_exception_to_error_code(str(e))
-
-                # Handle PyTorch OOM(Only supports Torch >= 2.6 native exception)
-                # If torch version is 2.1 or lower, please check exception message directly.
-                if hasattr(torch, "OutOfMemoryError") and isinstance(e, torch.OutOfMemoryError):
-                    error_msg = (
-                        "Device out of memory (OOM) reported by PyTorch, but it can possibly triggered by HCCL. "
-                        "Enable logs: export ASCEND_SLOG_PRINT_TO_STDOUT=1, "
-                        "export ASCEND_GLOBAL_LOG_LEVEL=3 to check if there's HCCL error messages"
-                    )
-                    logger.error(error_msg)
-                    error_code = ErrorCode.TEXT_GENERATOR_OUT_OF_MEMORY
-
-                if error_code is not None:
-                    self.error_code_collected_in_async = error_code
-
+                self.error_code_collected_in_async = convert_exception_to_error_code(str(e))
+               
                 if self.is_inference_pause or self.error_code_collected_in_async is not None:
                     logger.info(f"Mocking response due to inference pause for trace_ids={trace_ids}.")
                     if self.error_code_collected_in_async and launch_done is not None:

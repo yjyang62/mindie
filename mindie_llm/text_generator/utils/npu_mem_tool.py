@@ -207,6 +207,7 @@ class NpuMemoryWatcher:
         self.warmup_mem = 0
         self.threshold = 0
         self.warmup = True
+        self.mem_det_continuous_trigger = False
 
     def watch_npu_mem(self, rank_id, tag, is_multimodal=False, max_input_len=2048, trigger_count=-1):
         if self.warmup:
@@ -231,7 +232,7 @@ class NpuMemoryWatcher:
             return total_mem, peak_mem
 
         else:
-            if trigger_count == 0:
+            if trigger_count == 0 or self.mem_det_continuous_trigger:
                 free_mem, total_mem, _ = acl.rt.get_mem_info(1)
                 peak_mem = total_mem - free_mem
                 remaining_mem_warmup = total_mem - self.warmup_mem
@@ -248,6 +249,8 @@ class NpuMemoryWatcher:
                         f"{tag}, peak mem is: {gb(peak_mem):.2f}G, available mem is: {gb(free_mem):.2f}G. "
                         f"Remaining memory decreased {100 * remaining_mem_reduction:.2f}% compared to the warmup phase."
                     )
+                    if self.mem_det_continuous_trigger:
+                        raise RuntimeError("NPU out of memory.")
                     self.threshold = math.ceil(remaining_mem_reduction / THRESHOLD_GRAD) * THRESHOLD_GRAD
             else:
                 total_mem = 0

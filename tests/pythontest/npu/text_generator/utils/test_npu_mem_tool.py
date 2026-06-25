@@ -100,6 +100,15 @@ class Test_watch_npu_mem(unittest.TestCase):
         mock_get_mem.return_value = (128 * 1024 ** 2, 1024 ** 3, 0)
         total, peak = watch.watch_npu_mem(0, "success", False, 65536, 0)
 
+    @patch("acl.rt.get_mem_info")
+    def test_watch_npu_mem_continuous_trigger_raises_oom(self, mock_get_mem):
+        watch = NpuMemoryWatcher()
+        watch._set_warmup_mem(128 * 1024 ** 2)
+        watch.mem_det_continuous_trigger = True
+        mock_get_mem.return_value = (64 * 1024 ** 2, 1024 ** 3, 0)
+
+        with self.assertRaises(RuntimeError):
+            watch.watch_npu_mem(0, "After forward", trigger_count=999)
 
 
 if __name__ == "__main__":

@@ -24,7 +24,7 @@ sys.modules["mindie_llm.connector.common.model_execute_data_pb2"] = mock_model_e
 from mindie_llm.text_generator.generator import Generator  # noqa: E402
 from mindie_llm.text_generator.utils.request import Request  # noqa: E402
 from mindie_llm.text_generator.utils.sampling_output import SamplingOutput  # noqa: E402
-from mindie_llm.text_generator.plugins.plugin_manager import PluginManager  # noqa: E402
+from mindie_llm.text_generator.plugins.plugin_manager import PluginManager, MEM_DETECT_INTERVAL  # noqa: E402
 
 from mindie_llm.text_generator.utils.input_metadata import InputMetadata  # noqa: E402
 from mindie_llm.text_generator.adapter.generator_torch import GeneratorTorch  # noqa: E402
@@ -548,12 +548,19 @@ class TestPluginManagerMethods(unittest.TestCase):
         """测试mem_det_trigger_counter_acc方法"""
         # 初始值为0
         self.plugin_manager.mem_det_trigger_counter = 0
+        self.plugin_manager.mem_det_continuous_trigger = False
+        self.plugin_manager.watcher.mem_det_continuous_trigger = False
 
-        # 累加到MEM_DETECT_INTERVAL
-        for _ in range(1001):
+        # 累加到MEM_DETECT_INTERVAL后进入持续触发模式
+        for _ in range(MEM_DETECT_INTERVAL):
             self.plugin_manager.mem_det_trigger_counter_acc()
 
-        # 验证计数器被重置为0
+        self.assertEqual(self.plugin_manager.mem_det_trigger_counter, 0)
+        self.assertTrue(self.plugin_manager.mem_det_continuous_trigger)
+        self.assertTrue(self.plugin_manager.watcher.mem_det_continuous_trigger)
+
+        # 持续触发模式下计数器不再累加
+        self.plugin_manager.mem_det_trigger_counter_acc()
         self.assertEqual(self.plugin_manager.mem_det_trigger_counter, 0)
 
     def test_model_inputs_update_manager_no_plugins(self):

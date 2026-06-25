@@ -113,6 +113,7 @@ class PluginManager:
         self.previous_batch_is_prefill = False
         self.is_inference_pause = False
         self.mem_det_trigger_counter = 0
+        self.mem_det_continuous_trigger = False
         self.error_code_collected_in_async = None
         self.mempool_type = MemPoolType.DISABLED
         self.warmup_is_end = True
@@ -193,10 +194,14 @@ class PluginManager:
                 logger.error(f"[TIMEOUT] Save unfinished after {timeout_t} seconds. Exit")
 
     def mem_det_trigger_counter_acc(self):
+        if self.mem_det_continuous_trigger:
+            return
         if self.mem_det_trigger_counter < MEM_DETECT_INTERVAL:
-            self.mem_det_trigger_counter = self.mem_det_trigger_counter + 1
-        else:
+            self.mem_det_trigger_counter += 1
+        if self.mem_det_trigger_counter >= MEM_DETECT_INTERVAL:
+            self.mem_det_continuous_trigger = True
             self.mem_det_trigger_counter = 0
+            self.watcher.mem_det_continuous_trigger = True
 
     @timer.track_time_async("generate_token")
     def generate_token(self, input_metadata: InputMetadata, warmup=False) -> GenerationOutput:
@@ -843,6 +848,8 @@ class PluginManager:
         self.error_code_collected_in_async = None
         self.previous_batch_is_prefill = False
         self.mem_det_trigger_counter = 0
+        self.mem_det_continuous_trigger = False
+        self.watcher.mem_det_continuous_trigger = False
 
         if not self.async_inference:
             return
